@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: omnibot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+        placeholder: "Enter your Telegram Bot Token from @BotFather"
+      - key: NVIDIA_API_KEY
+        sync: false
+        placeholder: "Enter your NVIDIA API Key (nvapi-...)"
+      - key: NVIDIA_INVOKE_URL
+        value: "https://integrate.api.nvidia.com/v1/chat/completions"
