@@ -11,6 +11,10 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "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")
 NVIDIA_INVOKE_URL = os.getenv("NVIDIA_INVOKE_URL", "https://integrate.api.nvidia.com/v1/chat/completions")
 
+# Social Media Cookies (Agent Reach)
+TWITTER_COOKIE = os.getenv("TWITTER_COOKIE", "")
+REDDIT_COOKIE = os.getenv("REDDIT_COOKIE", "")
+
 # Validate configuration
 def check_config():
     errors = []

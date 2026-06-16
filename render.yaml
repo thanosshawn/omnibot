@@ -2,7 +2,7 @@ services:
   - type: web
     name: omnibot
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && pip install https://github.com/Panniantong/agent-reach/archive/main.zip && agent-reach install --env=auto
     startCommand: python main.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
@@ -13,3 +13,9 @@ services:
         placeholder: "Enter your NVIDIA API Key (nvapi-...)"
       - key: NVIDIA_INVOKE_URL
         value: "https://integrate.api.nvidia.com/v1/chat/completions"
+      - key: TWITTER_COOKIE
+        sync: false
+        placeholder: "Optional: Your Twitter/X auth cookie"
+      - key: REDDIT_COOKIE
+        sync: false
+        placeholder: "Optional: Your Reddit auth cookie"
