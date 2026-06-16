@@ -29,23 +29,29 @@ class ChatModule(BaseModule):
         chat = update.effective_chat
         message = update.message
         bot_username = context.bot.username
+        chat_id = chat.id
         
-        # In groups/supergroups, only reply if mentioned or if replying to the bot's own message
+        # Retrieve or create session
+        session = self.session_manager.get_session(chat_id)
+        
+        # In groups/supergroups, record the message to group memory and check response rules
         if chat.type in ["group", "supergroup"]:
+            sender_name = message.from_user.first_name if message.from_user else "Someone"
+            session.add_group_message(sender_name, message.text)
+            
             is_mentioned = f"@{bot_username}" in message.text
             is_reply_to_bot = (
                 message.reply_to_message and 
                 message.reply_to_message.from_user and 
                 message.reply_to_message.from_user.id == context.bot.id
             )
-            if not (is_mentioned or is_reply_to_bot):
+            
+            # Respond if directly addressed or if auto_reply mode is enabled
+            should_reply = is_mentioned or is_reply_to_bot or session.auto_reply
+            if not should_reply:
                 return
             
-        chat_id = chat.id
         user_message = message.text.replace(f"@{bot_username}", "").strip()
-        
-        # Retrieve or create session
-        session = self.session_manager.get_session(chat_id)
         
         # Add user's message to chat history
         session.add_message("user", user_message)

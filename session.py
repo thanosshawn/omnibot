@@ -14,10 +14,31 @@ class ChatSession:
         self.temperature: float = 1.00
         self.max_tokens: int = 4096
         self.top_p: float = 0.95
+        self.group_memory: List[Dict[str, Any]] = []
+        self.auto_reply: bool = False
 
     def clear_history(self):
         """Clears current conversation history."""
         self.history = []
+
+    def clear_group_memory(self):
+        """Clears the group memory buffer."""
+        self.group_memory = []
+
+    def add_group_message(self, sender: str, text: str):
+        """Adds a message to the rolling group memory buffer, keeping the last 50 messages."""
+        self.group_memory.append({"sender": sender, "text": text})
+        if len(self.group_memory) > 50:
+            self.group_memory = self.group_memory[-50:]
+
+    def get_group_transcript(self) -> str:
+        """Formats the current group memory buffer as a readable transcript."""
+        if not self.group_memory:
+            return "No recent messages in group memory."
+        lines = []
+        for msg in self.group_memory:
+            lines.append(f"[{msg['sender']}]: {msg['text']}")
+        return "\n".join(lines)
 
     def add_message(self, role: str, content: Any):
         """
@@ -49,6 +70,21 @@ class ChatSession:
             if "Style & Formatting Guidelines:" not in full_prompt:
                 full_prompt += style_guideline
             messages.append({"role": "system", "content": full_prompt})
+            
+        # If there is group chat memory, inject it to give the bot context of the recent discussion flow
+        if self.group_memory:
+            transcript = self.get_group_transcript()
+            messages.append({
+                "role": "system",
+                "content": (
+                    "Recent group conversation context (for situational awareness):\n"
+                    "Use this to understand what users were talking about before querying you.\n"
+                    "---------\n"
+                    f"{transcript}\n"
+                    "---------"
+                )
+            })
+
         messages.extend(self.history)
         return messages
 
