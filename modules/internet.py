@@ -93,17 +93,12 @@ class InternetModule(BaseModule):
         status_msg = await update.message.reply_text(f"🔍 *Searching the web for:* `{query}`...", parse_mode="Markdown")
         
         try:
-            # Using Jina Search for semantic web search results
-            response = await asyncio.to_thread(
-                requests.get, 
-                f"https://s.jina.ai/{query}", 
-                headers={"Accept": "application/json"},
-                timeout=20
-            )
-            response.raise_for_status()
+            # Using duckduckgo-search for zero-config web search results
+            from duckduckgo_search import DDGS
+            def do_search():
+                return list(DDGS().text(query, max_results=5))
             
-            data = response.json()
-            search_results = data.get("data", [])
+            search_results = await asyncio.to_thread(do_search)
             
             if not search_results:
                 await status_msg.edit_text("❌ No relevant search results found.")
@@ -111,10 +106,10 @@ class InternetModule(BaseModule):
                 
             # Compile search context
             context_text = ""
-            for item in search_results[:5]: # Take top 5 results
+            for item in search_results:
                 context_text += f"Title: {item.get('title', 'No Title')}\n"
-                context_text += f"URL: {item.get('url', 'No URL')}\n"
-                context_text += f"Description: {item.get('description', 'No Description')}\n\n"
+                context_text += f"URL: {item.get('href', 'No URL')}\n"
+                context_text += f"Description: {item.get('body', 'No Description')}\n\n"
                 
             system_prompt = (
                 "You are Omnibot, a highly capable assistant. You have just performed a web search. "
@@ -184,7 +179,7 @@ class InternetModule(BaseModule):
             await status_msg.edit_text(f"❌ *Failed to search Twitter.* \nError: `{str(e)}`", parse_mode="Markdown")
 
     async def reddit_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Searches Reddit using the public JSON API."""
+        """Searches Reddit using the public RSS feed to bypass API blocks."""
         if not update.message or not context.args:
             await update.message.reply_text("❌ *Usage*: `/reddit <query>`", parse_mode="Markdown")
             return
@@ -193,32 +188,36 @@ class InternetModule(BaseModule):
         await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
         status_msg = await update.message.reply_text(f"👾 *Searching Reddit for:* `{query}`...", parse_mode="Markdown")
         try:
+            import xml.etree.ElementTree as ET
             headers = {"User-Agent": "Omnibot/1.0"}
             response = await asyncio.to_thread(
                 requests.get, 
-                f"https://www.reddit.com/search.json?q={query}&limit=5", 
+                f"https://www.reddit.com/search.rss?q={query}&limit=5", 
                 headers=headers,
                 timeout=20
             )
             response.raise_for_status()
-            data = response.json()
-            posts = data.get("data", {}).get("children", [])
             
-            if not posts:
+            root = ET.fromstring(response.text)
+            ns = {'atom': 'http://www.w3.org/2005/Atom'}
+            entries = root.findall('atom:entry', ns)
+            
+            if not entries:
                 await status_msg.edit_text("❌ No relevant Reddit posts found.")
                 return
                 
             context_text = ""
-            for post in posts:
-                p = post.get("data", {})
-                context_text += f"Title: {p.get('title', '')}\n"
-                context_text += f"Subreddit: {p.get('subreddit_name_prefixed', '')}\n"
-                context_text += f"Score: {p.get('score', 0)}\n"
-                context_text += f"Content: {p.get('selftext', '')[:200]}\n\n"
+            for entry in entries[:5]:
+                title = entry.find('atom:title', ns).text if entry.find('atom:title', ns) is not None else ""
+                author = entry.find('atom:author/atom:name', ns)
+                author_name = author.text if author is not None else ""
+                
+                context_text += f"Title: {title}\n"
+                context_text += f"Author: {author_name}\n\n"
                 
             system_prompt = (
                 "You are Omnibot. You just searched Reddit. Synthesize an answer to the user's query "
-                "based strictly on these Reddit posts. Cite subreddits if applicable. Be concise and use markdown."
+                "based strictly on these Reddit posts. Cite subreddits or authors if applicable. Be concise and use markdown."
             )
             api_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": f"Query: {query}\n\nResults:\n{context_text}"}]
             answer = await self.nvidia_client.chat_completion(messages=api_messages, temperature=0.4, max_tokens=2048, top_p=0.9)
